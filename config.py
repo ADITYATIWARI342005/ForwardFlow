@@ -4,28 +4,21 @@
 # Your 10 repositories to monitor (format: "owner/repo")
 REPOSITORIES = [
     "kubernetes/kubernetes",
-               # Kubernetes
     "prometheus/prometheus",
     "prometheus/alertmanager",
-    "prometheus/client_golang"
+    "prometheus/client_golang",
     "prometheus-community/helm-charts",
-                          # Envoy Proxy
-    "istio/istio",   
+    "istio/istio",
     "istio/community",
     "istio/istio.io",
-
-    "jaegertracing / helm-charts",                # Istio
-    "jaegertracing/jaeger",  
+    "jaegertracing/helm-charts",
+    "jaegertracing/jaeger",
     "jaegertracing/jaeger-ui",
     "jaegertracing/jaeger-operator",
-
     "cilium/cilium",
     "cilium/ebpf",
     "cilium/tetragon",
     "cilium/cilium-cli",
-                      # gRPC
-    # Add your specific repositories here
-    # "your-org/your-repo",
 ]
 
 # Check interval in seconds (60-240 seconds = 1-4 minutes)
