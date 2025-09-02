@@ -76,13 +76,18 @@ class Config:
     telegram_chat_id: str = os.getenv('TELEGRAM_CHAT_ID', '')
     check_interval: int = int(os.getenv('CHECK_INTERVAL', str(DEFAULT_CHECK_INTERVAL)))
     db_path: str = os.getenv('DB_PATH', resolve_default_db_path(DATABASE_PATH))
-    repositories: List[str] = field(default_factory=lambda: list(REPOSITORIES))
+    repositories: List[str] = field(default_factory=list)
     log_level: str = os.getenv('LOG_LEVEL', LOG_LEVEL)
     batch_size: int = int(os.getenv('BATCH_SIZE', str(BATCH_SIZE)))
     batch_delay: int = int(os.getenv('BATCH_DELAY', str(BATCH_DELAY)))
     notification_delay: int = int(os.getenv('NOTIFICATION_DELAY', str(NOTIFICATION_DELAY)))
     api_timeout: int = int(os.getenv('API_TIMEOUT', str(API_TIMEOUT)))
     check_buffer_minutes: int = int(os.getenv('CHECK_BUFFER_MINUTES', str(CHECK_BUFFER_MINUTES)))
+
+    def __post_init__(self):
+        # If repositories not provided, copy from module-level REPOSITORIES safely
+        if not self.repositories:
+            self.repositories = list(REPOSITORIES)
 
 @dataclass
 class Issue:
