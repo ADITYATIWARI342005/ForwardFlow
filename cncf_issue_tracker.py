@@ -16,7 +16,17 @@ from dataclasses import dataclass
 
 # Configuration
 try:
-    from config import REPOSITORIES, DEFAULT_CHECK_INTERVAL, DATABASE_PATH
+    from config import (
+        REPOSITORIES,
+        DEFAULT_CHECK_INTERVAL,
+        DATABASE_PATH,
+        LOG_LEVEL,
+        BATCH_SIZE,
+        BATCH_DELAY,
+        NOTIFICATION_DELAY,
+        API_TIMEOUT,
+        CHECK_BUFFER_MINUTES,
+    )
 except ImportError:
     # Fallback configuration if config.py doesn't exist
     REPOSITORIES = [
@@ -33,15 +43,46 @@ except ImportError:
     ]
     DEFAULT_CHECK_INTERVAL = 180
     DATABASE_PATH = "cncf_issues.db"
+    LOG_LEVEL = "INFO"
+    BATCH_SIZE = 3
+    BATCH_DELAY = 2
+    NOTIFICATION_DELAY = 1
+    API_TIMEOUT = 10
+    CHECK_BUFFER_MINUTES = 2
+
+
+def resolve_default_db_path(default_path: str) -> str:
+    """Select a safe database path for Railway or local runs.
+
+    Preference order:
+    1) /data (Railway persistent disk if mounted)
+    2) /tmp (ephemeral but writable)
+    3) Provided default relative path
+    """
+    try:
+        if os.path.isdir("/data"):
+            return "/data/cncf_issues.db"
+        if os.path.isdir("/tmp"):
+            return "/tmp/cncf_issues.db"
+    except Exception:
+        pass
+    return default_path
 
 @dataclass
 class Config:
     github_token: str = os.getenv('GITHUB_TOKEN', '')
-    telegram_bot_token: str = os.getenv('TELEGRAM_BOT_TOKEN', '8450859348:AAEprYshWYOz3MEFgXSaE65TooRI8b9Ygyg')
-    telegram_chat_id: str = os.getenv('TELEGRAM_CHAT_ID', '5757790216')
+    # Remove insecure fallbacks: require explicit env vars
+    telegram_bot_token: str = os.getenv('TELEGRAM_BOT_TOKEN', '')
+    telegram_chat_id: str = os.getenv('TELEGRAM_CHAT_ID', '')
     check_interval: int = int(os.getenv('CHECK_INTERVAL', str(DEFAULT_CHECK_INTERVAL)))
-    db_path: str = os.getenv('DB_PATH', DATABASE_PATH)
+    db_path: str = os.getenv('DB_PATH', resolve_default_db_path(DATABASE_PATH))
     repositories: List[str] = REPOSITORIES
+    log_level: str = os.getenv('LOG_LEVEL', LOG_LEVEL)
+    batch_size: int = int(os.getenv('BATCH_SIZE', str(BATCH_SIZE)))
+    batch_delay: int = int(os.getenv('BATCH_DELAY', str(BATCH_DELAY)))
+    notification_delay: int = int(os.getenv('NOTIFICATION_DELAY', str(NOTIFICATION_DELAY)))
+    api_timeout: int = int(os.getenv('API_TIMEOUT', str(API_TIMEOUT)))
+    check_buffer_minutes: int = int(os.getenv('CHECK_BUFFER_MINUTES', str(CHECK_BUFFER_MINUTES)))
 
 @dataclass
 class Issue:
@@ -134,7 +175,7 @@ class GitHubAPI:
         }
         
         try:
-            timeout = aiohttp.ClientTimeout(total=10)
+            timeout = aiohttp.ClientTimeout(total=self.timeout_seconds)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(url, headers=self.headers, params=params) as response:
                     if response.status == 200:
@@ -231,23 +272,25 @@ class CNCFIssueTracker:
         
         # Setup logging
         logging.basicConfig(
-            level=logging.INFO,
+            level=getattr(logging, self.config.log_level.upper(), logging.INFO),
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[logging.StreamHandler()]
         )
         self.logger = logging.getLogger(__name__)
+        # Propagate API timeout to GitHub client
+        self.github.timeout_seconds = self.config.api_timeout
     
     async def check_all_repositories(self):
         """Check all repositories for new issues."""
         self.logger.info(f"🔍 Checking {len(self.config.repositories)} repositories...")
         
         new_issues_count = 0
-        check_minutes = max(5, int(self.config.check_interval / 60) + 2)  # Buffer time
+        check_minutes = max(5, int(self.config.check_interval / 60) + self.config.check_buffer_minutes)  # Buffer time
         
         # Process repositories in batches to avoid overwhelming APIs
-        batch_size = 3
+        batch_size = max(1, self.config.batch_size)
         for i in range(0, len(self.config.repositories), batch_size):
-            batch = self.config.repositories[i:i+batch_size]
+            batch = self.config.repositories[i:i + batch_size]
             
             tasks = []
             for repo in batch:
@@ -264,7 +307,7 @@ class CNCFIssueTracker:
             
             # Small delay between batches
             if i + batch_size < len(self.config.repositories):
-                await asyncio.sleep(2)
+                await asyncio.sleep(max(0, self.config.batch_delay))
         
         if new_issues_count > 0:
             self.logger.info(f"✅ Found {new_issues_count} new issues")
@@ -289,7 +332,7 @@ class CNCFIssueTracker:
                         self.logger.info(f"📢 Notified: {repository}#{issue.number}")
                     
                     # Rate limiting delay
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(max(0, self.config.notification_delay))
             
             return new_count
             
@@ -356,7 +399,7 @@ def main():
     
     # Validate configuration
     if not config.telegram_bot_token or not config.telegram_chat_id:
-        print("❌ Error: Telegram credentials not configured")
+        print("❌ Error: Telegram credentials not configured (set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)")
         return
     
     if not config.repositories:
@@ -369,6 +412,8 @@ def main():
     print(f"   • Repositories: {len(config.repositories)}")
     print(f"   • GitHub token: {'✅ Configured' if config.github_token else '❌ Not set (using public API)'}")
     print(f"   • Telegram: ✅ Configured")
+    print(f"   • Database path: {config.db_path}")
+    print(f"   • Log level: {config.log_level}")
     
     # Start the tracker
     tracker = CNCFIssueTracker(config)

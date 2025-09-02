@@ -23,32 +23,32 @@ Each notification includes:
 
 ### Environment Variables
 
-Set these in your Railway dashboard:
+Set these in your Railway dashboard (no hardcoded secrets in code):
 
 ```bash
-GITHUB_TOKEN=your_github_token_here          # Optional but recommended
-TELEGRAM_BOT_TOKEN=8450859348:AAEprYshWYOz3MEFgXSaE65TooRI8b9Ygyg
-TELEGRAM_CHAT_ID=5757790216
-CHECK_INTERVAL=180                           # 3 minutes (60-240 seconds)
+GITHUB_TOKEN=<your_github_personal_access_token>   # Optional but recommended
+TELEGRAM_BOT_TOKEN=<your_telegram_bot_token>
+TELEGRAM_CHAT_ID=<your_chat_id>
+CHECK_INTERVAL=180                                  # 3 minutes (60-240 seconds)
+# Optional tuning (defaults shown):
+# LOG_LEVEL=INFO
+# BATCH_SIZE=3
+# BATCH_DELAY=2
+# NOTIFICATION_DELAY=1
+# API_TIMEOUT=10
+# CHECK_BUFFER_MINUTES=2
+# DB_PATH=/data/cncf_issues.db   # If you mount Railway persistent volume
 ```
 
 ### Repository List
 
-Edit the `repositories` list in `cncf_issue_tracker.py` (around line 31) with your 10 repositories:
+Edit the repository list in `config.py` with your 10 repositories:
 
 ```python
-self.repositories = [
-    "kubernetes/kubernetes",           # Kubernetes
-    "prometheus/prometheus",          # Prometheus  
-    "etcd-io/etcd",                  # etcd
-    "containerd/containerd",         # containerd
-    "envoyproxy/envoy",              # Envoy Proxy
-    "helm/helm",                     # Helm
-    "istio/istio",                   # Istio
-    "jaegertracing/jaeger",          # Jaeger
-    "fluent/fluentd",                # Fluentd
-    "grpc/grpc",                     # gRPC
-    # Add your specific repositories here
+REPOSITORIES = [
+    "kubernetes/kubernetes",
+    "prometheus/prometheus",
+    # ...
 ]
 ```
 

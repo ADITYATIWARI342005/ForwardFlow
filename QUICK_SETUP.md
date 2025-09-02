@@ -40,10 +40,12 @@ railway up
 ### 3. ⚙️ Set Environment Variables (1 minute)
 In Railway dashboard → Variables:
 ```
-TELEGRAM_BOT_TOKEN = 8450859348:AAEprYshWYOz3MEFgXSaE65TooRI8b9Ygyg
-TELEGRAM_CHAT_ID = 5757790216
-CHECK_INTERVAL = 180
-GITHUB_TOKEN = your_token_here (optional)
+TELEGRAM_BOT_TOKEN=<your_telegram_bot_token>
+TELEGRAM_CHAT_ID=<your_chat_id>
+CHECK_INTERVAL=180
+GITHUB_TOKEN=<your_github_personal_access_token>  # optional but recommended
+# Optional (defaults): LOG_LEVEL=INFO, BATCH_SIZE=3, BATCH_DELAY=2, NOTIFICATION_DELAY=1
+# If you attach a persistent volume, set: DB_PATH=/data/cncf_issues.db
 ```
 
 ### 4. 🎯 Test Your Bot (1 minute)
