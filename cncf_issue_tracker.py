@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import List
 import aiohttp
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # Configuration
 try:
@@ -76,7 +76,7 @@ class Config:
     telegram_chat_id: str = os.getenv('TELEGRAM_CHAT_ID', '')
     check_interval: int = int(os.getenv('CHECK_INTERVAL', str(DEFAULT_CHECK_INTERVAL)))
     db_path: str = os.getenv('DB_PATH', resolve_default_db_path(DATABASE_PATH))
-    repositories: List[str] = REPOSITORIES
+    repositories: List[str] = field(default_factory=lambda: list(REPOSITORIES))
     log_level: str = os.getenv('LOG_LEVEL', LOG_LEVEL)
     batch_size: int = int(os.getenv('BATCH_SIZE', str(BATCH_SIZE)))
     batch_delay: int = int(os.getenv('BATCH_DELAY', str(BATCH_DELAY)))
