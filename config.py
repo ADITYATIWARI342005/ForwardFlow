@@ -3,7 +3,6 @@
 
 # Your 10 repositories to monitor (format: "owner/repo")
 REPOSITORIES = [
-    "kubernetes/kubernetes",
     "prometheus/prometheus",
     "prometheus/alertmanager",
     "prometheus/client_golang",
