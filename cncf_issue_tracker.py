@@ -93,6 +93,7 @@ class Issue:
     created_at: str
     repository: str
     author: str
+    labels: List[str]
 
 class Database:
     def __init__(self, db_path: str):
@@ -204,6 +205,11 @@ class GitHubAPI:
     
     def _parse_issue(self, issue_data: dict, repository: str) -> Issue:
         """Parse GitHub API issue data."""
+        labels = []
+        try:
+            labels = [lbl.get('name', '') for lbl in issue_data.get('labels', []) if isinstance(lbl, dict)]
+        except Exception:
+            labels = []
         return Issue(
             id=issue_data['id'],
             number=issue_data['number'],
@@ -211,7 +217,8 @@ class GitHubAPI:
             url=issue_data['html_url'],
             created_at=issue_data['created_at'],
             repository=repository,
-            author=issue_data['user']['login']
+            author=issue_data['user']['login'],
+            labels=labels,
         )
 
 class TelegramBot:
@@ -253,13 +260,23 @@ class TelegramBot:
         # Truncate very long titles
         if len(title) > 80:
             title = title[:77] + "..."
+        # Labels (escaped and truncated per label)
+        labels_line = ""
+        if issue.labels:
+            safe_labels = []
+            for name in issue.labels[:6]:  # show up to 6 labels
+                safe = name.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                if len(safe) > 20:
+                    safe = safe[:17] + "..."
+                safe_labels.append(f"<code>{safe}</code>")
+            labels_line = "\n🏷️ <b>Labels:</b> " + ", ".join(safe_labels)
         
         message = f"""🆕 <b>New Issue</b>
 
 📋 <b>Title:</b> {title}
 👤 <b>Author:</b> @{issue.author}
 📦 <b>Repository:</b> <code>{issue.repository}</code>
-🔗 <b>Link:</b> <a href="{issue.url}">#{issue.number}</a>"""
+🔗 <b>Link:</b> <a href="{issue.url}">#{issue.number}</a>{labels_line}"""
         
         return message
 
