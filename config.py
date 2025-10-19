@@ -31,16 +31,20 @@ try:
 except ImportError:
     # Fallback configuration if config.py doesn't exist
     REPOSITORIES = [
-        "kubernetes/kubernetes",
         "prometheus/prometheus",
-        "etcd-io/etcd",
-        "containerd/containerd",
+        "prometheus/client_golang",
+        "open-telemetry/opentelemetry-collector-contrib",
+        "prometheus/docs",
+        "envoyproxy/gateway",
         "envoyproxy/envoy",
-        "helm/helm",
-        "istio/istio",
         "jaegertracing/jaeger",
-        "fluent/fluentd",
-        "grpc/grpc",
+        "jaegertracing/jaeger-operator",
+        "jaegertracing/helm-charts",
+        "jaegertracing/documentation",
+        "jaegertracing/jaeger-ui",
+        "cilium/cilium.io",
+        "cilium/cilium",
+        "cilium/hubble-ui"
     ]
     DEFAULT_CHECK_INTERVAL = 180
     DATABASE_PATH = "cncf_issues.db"
