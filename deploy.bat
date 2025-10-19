@@ -32,16 +32,20 @@ if errorlevel 1 (
 )
 
 echo.
-echo 🎯 Next Steps:
-echo ===============
-echo 1. 📋 Edit the repository list in cncf_issue_tracker.py (around line 31)
-echo 2. 🌐 Go to railway.app and sign up/login with GitHub
-echo 3. 🚀 Click 'Deploy from GitHub repo' and select this repository
-echo 4. ⚙️  Set environment variables in Railway dashboard:
-echo    • GITHUB_TOKEN (optional but recommended)
-echo    • TELEGRAM_BOT_TOKEN = 8450859348:AAEprYshWYOz3MEFgXSaE65TooRI8b9Ygyg
-echo    • TELEGRAM_CHAT_ID = 5757790216
-echo    • CHECK_INTERVAL = 180 (or your preferred interval)
+echo 🎯 Next Steps for Sevalla Deployment:
+echo ======================================
+echo 1. 📋 Edit the repository list in config.py
+echo 2. 🌐 Go to sevalla.com and login to your dashboard
+echo 3. 🚀 Deploy your application from GitHub
+echo 4. ⚙️  Set environment variables in Sevalla dashboard:
+echo    • TELEGRAM_BOT_TOKEN = your_telegram_bot_token
+echo    • TELEGRAM_CHAT_ID = your_chat_id
+echo    • GITHUB_TOKEN = your_github_token (optional but recommended)
+echo    • CHECK_INTERVAL = 180 (or your preferred interval in seconds)
+echo    • PORT = (Sevalla sets this automatically)
+echo.
+echo 🔒 SECURITY: Never commit credentials to Git!
+echo    Always set them as environment variables in Sevalla dashboard.
 echo.
 echo 🎉 Your bot will be deployed and start monitoring repositories!
 echo.
