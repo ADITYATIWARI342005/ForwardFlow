@@ -44,7 +44,7 @@ except ImportError:
         "cilium/cilium.io",
         "cilium/cilium",
         "cilium/hubble-ui"
-    ]
+    }
     DEFAULT_CHECK_INTERVAL = 180
     DATABASE_PATH = "cncf_issues.db"
     LOG_LEVEL = "INFO"
