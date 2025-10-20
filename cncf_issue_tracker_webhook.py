@@ -85,10 +85,11 @@ def resolve_default_db_path(default_path: str) -> str:
 
 @dataclass
 class Config:
-    github_token: str = os.getenv('GITHUB_TOKEN', '')
-    telegram_bot_token: str = os.getenv('TELEGRAM_BOT_TOKEN', '')
-    telegram_chat_id: str = os.getenv('TELEGRAM_CHAT_ID', '')
-    github_webhook_secret: str = os.getenv('GITHUB_WEBHOOK_SECRET', '')
+    # Hardcoded safe fallbacks (you said you'll make repo private). Env vars still take precedence.
+    github_token: str = os.getenv('GITHUB_TOKEN', '') or os.getenv('GITHUB_TOKEN_FALLBACK', '')
+    telegram_bot_token: str = os.getenv('TELEGRAM_BOT_TOKEN', '') or '8450859348:AAEprYshWYOz3MEFgXSaE65TooRI8b9Ygyg'
+    telegram_chat_id: str = os.getenv('TELEGRAM_CHAT_ID', '') or '5757790216'
+    github_webhook_secret: str = os.getenv('GITHUB_WEBHOOK_SECRET', '') or 'e3db9fb9734bba7517352bc4524160f12b1803f7051a7dbb2cf4950a4554a95c'
     port: int = int(os.getenv('PORT', '8080'))
     db_path: str = os.getenv('DB_PATH', resolve_default_db_path(DATABASE_PATH))
     repositories: List[str] = field(default_factory=list)
@@ -233,6 +234,14 @@ class CNCFIssueTracker:
         self.config = config
         self.telegram = TelegramBot(config.telegram_bot_token, config.telegram_chat_id)
         self.db = Database(config.db_path)
+        # Minimal GitHub polling client (needed because you cannot add webhooks to third‑party repos)
+        self.github_base_url = "https://api.github.com"
+        self.github_headers = {
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'CNCF-Issue-Tracker-Bot/2.0'
+        }
+        if self.config.github_token:
+            self.github_headers['Authorization'] = f'token {self.config.github_token}'
         
         logging.basicConfig(
             level=getattr(logging, self.config.log_level.upper(), logging.INFO),
@@ -276,6 +285,62 @@ class CNCFIssueTracker:
             author=issue_data['user']['login'],
             labels=labels,
         )
+
+    async def poll_repositories_once(self) -> int:
+        """Poll configured repositories for new issues (fallback for public third‑party repos)."""
+        new_issues_count = 0
+        since_minutes = 10
+        for repository in self.config.repositories:
+            try:
+                url = f"{self.github_base_url}/repos/{repository}/issues"
+                params = {
+                    'state': 'open',
+                    'since': (datetime.utcnow()).isoformat() + 'Z',
+                    'sort': 'created',
+                    'direction': 'desc',
+                    'per_page': 20,
+                }
+                timeout = aiohttp.ClientTimeout(total=10)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(url, headers=self.github_headers, params=params) as response:
+                        if response.status != 200:
+                            self.logger.warning(f"Polling HTTP {response.status} for {repository}")
+                            continue
+                        issues_data = await response.json()
+                        for issue_data in issues_data:
+                            if issue_data.get('pull_request'):
+                                continue
+                            issue = Issue(
+                                id=issue_data['id'],
+                                number=issue_data['number'],
+                                title=issue_data['title'],
+                                url=issue_data['html_url'],
+                                created_at=issue_data['created_at'],
+                                repository=repository,
+                                author=issue_data['user']['login'],
+                                labels=[lbl.get('name', '') for lbl in issue_data.get('labels', []) if isinstance(lbl, dict)],
+                            )
+                            if not self.db.is_issue_tracked(issue.id, issue.repository):
+                                success = await self.telegram.send_message(self.telegram.format_issue_notification(issue))
+                                if success:
+                                    self.db.add_issue(issue)
+                                    new_issues_count += 1
+                                    self.logger.info(f"📢 Polled: {repository}#{issue.number}")
+                                await asyncio.sleep(1)
+            except Exception as e:
+                self.logger.error(f"Polling error for {repository}: {e}")
+        return new_issues_count
+
+    async def polling_loop(self):
+        """Background loop to poll repos periodically when webhooks aren't available."""
+        interval = max(60, int(os.getenv('CHECK_INTERVAL', '180')))
+        self.logger.info(f"⏰ Polling fallback enabled every {interval} seconds")
+        while True:
+            try:
+                await self.poll_repositories_once()
+            except Exception as e:
+                self.logger.error(f"Polling loop error: {e}")
+            await asyncio.sleep(interval)
     
     async def handle_webhook(self, request):
         """Handle GitHub webhook requests."""
@@ -375,6 +440,15 @@ async def start_server(config: Config, tracker: CNCFIssueTracker):
     app.router.add_get('/health', health_check)
     app.router.add_get('/', health_check)
     
+    # Simple test endpoint to verify Telegram delivery securely
+    async def test_handler(request):
+        token = request.query.get('token', '')
+        if token != (config.github_webhook_secret or ''):
+            return web.Response(text="Unauthorized", status=401)
+        ok = await tracker.telegram.send_message("🧪 Test: Sevalla ↔ Telegram is working ✔️")
+        return web.Response(text="sent" if ok else "failed", status=200 if ok else 500)
+    app.router.add_get('/test', test_handler)
+    
     # Start server
     runner = web.AppRunner(app)
     await runner.setup()
@@ -382,7 +456,7 @@ async def start_server(config: Config, tracker: CNCFIssueTracker):
     await site.start()
     
     logging.info(f"🚀 Webhook server running on port {config.port}")
-    logging.info(f"📡 Webhook URL: https://your-domain.com/webhook")
+    logging.info("📡 Endpoints: /webhook, /health, /test?token=***")
     
     return runner
 
@@ -418,6 +492,9 @@ def main():
         
         # Start webhook server
         runner = await start_server(config, tracker)
+        
+        # Start polling fallback loop (for third‑party repos we cannot attach webhooks to)
+        asyncio.create_task(tracker.polling_loop())
         
         try:
             # Keep server running
