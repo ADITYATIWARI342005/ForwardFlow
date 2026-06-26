@@ -1,202 +1,133 @@
-# GitHub Issue Tracker Bot
+# ForwardFlow
 
-A Telegram bot that monitors CNCF and open source repositories for new issues and sends clean, formatted notifications.
+A GitHub issue tracker bot that monitors public repositories and delivers formatted Telegram notifications for new issues.
 
-## 🚀 Features
+---
 
-- **Real-time Monitoring**: Checks repositories every 1-4 minutes (configurable)
-- **Clean Notifications**: Beautiful Telegram messages with issue details
-- **Smart Tracking**: Prevents duplicate notifications using SQLite database
-- **Rate Limit Protection**: Built-in GitHub API rate limiting protection
-- **Batch Processing**: Efficiently processes multiple repositories
-- **Error Handling**: Automatic retry and error notifications
+## How It Works
 
-## 📱 Notification Format
+The bot polls configured repositories on a fixed interval using the GitHub Issues API. For each repository, it fetches issues created within a rolling lookback window, checks each one against a local SQLite database, and sends a Telegram notification for any issue it has not seen before. Repositories are processed in batches to stay within GitHub API rate limits.
 
-Each notification includes:
-- 🆕 Issue title
-- 👤 Author username
-- 📦 Repository name
-- 🔗 Direct GitHub link
+---
 
-## ⚙️ Configuration
+## Architecture
 
-### Environment Variables
+- **Polling loop** -- aiohttp-based async loop, configurable interval (60-240 seconds)
+- **Batch processing** -- repositories processed in groups of 3 with inter-batch delays
+- **Deduplication** -- SQLite database with `(issue_id, repository)` composite primary key prevents duplicate notifications
+- **Database path resolution** -- prefers `/data` (Railway persistent disk) over `/tmp` over local path
+- **Restart policy** -- Railway restarts the process on failure, up to 10 retries
 
-Set these in your Railway dashboard (no hardcoded secrets in code):
+---
 
-```bash
-GITHUB_TOKEN=<your_github_personal_access_token>   # Optional but recommended
-TELEGRAM_BOT_TOKEN=<your_telegram_bot_token>
-TELEGRAM_CHAT_ID=<your_chat_id>
-CHECK_INTERVAL=180                                  # 3 minutes (60-240 seconds)
-# Optional tuning (defaults shown):
-# LOG_LEVEL=INFO
-# BATCH_SIZE=3
-# BATCH_DELAY=2
-# NOTIFICATION_DELAY=1
-# API_TIMEOUT=10
-# CHECK_BUFFER_MINUTES=2
-# DB_PATH=/data/cncf_issues.db   # If you mount Railway persistent volume
-```
+## Notification Format
 
-### Repository List
+Each Telegram message includes:
 
-Edit the repository list in `config.py` with your 10 repositories:
+- Issue title (truncated at 80 characters)
+- Author username
+- Repository name
+- Direct link to the issue
+- Labels (up to 6, each truncated at 20 characters)
+
+Messages are sent as HTML via the Telegram Bot API.
+
+---
+
+## Configuration
+
+All settings are controlled via environment variables. The defaults are defined in `config.py` and can be overridden at runtime.
+
+| Variable | Default | Description |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | required | Telegram bot token from BotFather |
+| `TELEGRAM_CHAT_ID` | required | Target chat or channel ID |
+| `GITHUB_TOKEN` | optional | Personal access token for higher rate limits |
+| `CHECK_INTERVAL` | `180` | Poll interval in seconds (60-240) |
+| `DB_PATH` | auto-resolved | Path to SQLite database file |
+| `LOG_LEVEL` | `INFO` | Logging verbosity (DEBUG, INFO, WARNING, ERROR) |
+| `BATCH_SIZE` | `3` | Repositories processed per batch |
+| `BATCH_DELAY` | `2` | Seconds between batches |
+| `NOTIFICATION_DELAY` | `1` | Seconds between Telegram notifications |
+| `API_TIMEOUT` | `10` | GitHub API request timeout in seconds |
+| `CHECK_BUFFER_MINUTES` | `2` | Extra buffer added to the lookback window |
+
+**GitHub API rate limits:**
+- Without token: 60 requests/hour
+- With token: 5,000 requests/hour
+
+---
+
+## Repository List
+
+Edit `config.py` to set the repositories to monitor (up to any number, formatted as `owner/repo`):
 
 ```python
 REPOSITORIES = [
-    "kubernetes/kubernetes",
-    "prometheus/prometheus",
-    # ...
+    "litmuschaos/litmus",
+    "knative/docs",
+    "antrea-io/antrea",
+    # add more here
 ]
 ```
 
-## 🚀 Railway Deployment
+---
 
-### Option 1: Deploy from GitHub (Recommended)
+## Deployment (Railway)
 
-1. **Push to GitHub**:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/yourusername/cncf-issue-bot.git
-   git push -u origin main
-   ```
+The project includes a `railway.json` configured for Nixpacks with automatic restart on failure.
 
-2. **Deploy on Railway**:
-   - Visit [railway.app](https://railway.app)
-   - Sign up/login with GitHub
-   - Click "Deploy from GitHub repo"
-   - Select your repository
+1. Push the repository to GitHub.
 
-### Option 2: Direct Deployment
+2. Create a new project on [railway.app](https://railway.app) and connect the repository.
 
-1. **Install Railway CLI**:
-   ```bash
-   npm install -g @railway/cli
-   ```
+3. Add the following environment variables in the Railway dashboard:
 
-2. **Deploy**:
-   ```bash
-   railway login
-   railway init
-   railway up
-   ```
+```
+TELEGRAM_BOT_TOKEN=your_token
+TELEGRAM_CHAT_ID=your_chat_id
+GITHUB_TOKEN=your_github_token   # recommended
+CHECK_INTERVAL=180
+```
 
-## 🔧 Environment Variables Setup
+4. Railway will build and deploy automatically. The bot sends a startup notification to your Telegram chat when it comes online.
 
-In your Railway dashboard:
+For persistent issue tracking across restarts, mount a Railway volume at `/data`. Without it, the bot uses `/tmp` which is ephemeral.
 
-1. Go to your project → Variables
-2. Add these environment variables:
-   - `GITHUB_TOKEN`: Your GitHub personal access token
-   - `TELEGRAM_BOT_TOKEN`: 8450859348:AAEprYshWYOz3MEFgXSaE65TooRI8b9Ygyg
-   - `TELEGRAM_CHAT_ID`: 5757790216
-   - `CHECK_INTERVAL`: 180 (or your preferred interval)
+---
 
-## 📊 Check Intervals
+## Local Setup
 
-- `60` = 1 minute
-- `120` = 2 minutes  
-- `180` = 3 minutes (default)
-- `240` = 4 minutes
+**Requirements:** Python 3.7+
 
-## 🎯 Popular CNCF Projects
+```bash
+pip install -r requirements.txt
+```
 
-Here are some popular CNCF projects you might want to monitor:
+Set environment variables:
 
-- `kubernetes/kubernetes` - Kubernetes
-- `prometheus/prometheus` - Prometheus
-- `etcd-io/etcd` - etcd
-- `containerd/containerd` - containerd
-- `envoyproxy/envoy` - Envoy Proxy
-- `helm/helm` - Helm
-- `istio/istio` - Istio
-- `jaegertracing/jaeger` - Jaeger
-- `fluent/fluentd` - Fluentd
-- `grpc/grpc` - gRPC
-- `linkerd/linkerd2` - Linkerd
-- `cilium/cilium` - Cilium
+```bash
+export TELEGRAM_BOT_TOKEN="your_token"
+export TELEGRAM_CHAT_ID="your_chat_id"
+export GITHUB_TOKEN="your_github_token"
+```
 
-## 🔍 How It Works
+Run the bot:
 
-1. **Startup**: Bot sends startup notification with repository list
-2. **Monitoring**: Checks each repository every configured interval
-3. **Issue Detection**: Fetches recent issues using GitHub API
-4. **Deduplication**: Uses SQLite database to track seen issues
-5. **Notification**: Sends formatted Telegram message for new issues
-6. **Error Handling**: Automatic retry and error notifications
+```bash
+python cncf_issue_tracker.py
+```
 
-## 🛡️ Rate Limiting
+To verify your configuration and test the Telegram connection before running:
 
-- **Without GitHub Token**: 60 requests/hour per IP
-- **With GitHub Token**: 5,000 requests/hour
-- **Batch Processing**: Processes repositories in groups of 3
-- **Smart Delays**: Built-in delays between API calls
+```bash
+python test_bot.py
+```
 
-## 📝 Local Testing
+---
 
-1. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Error Handling
 
-2. **Set environment variables**:
-   ```bash
-   export TELEGRAM_BOT_TOKEN="8450859348:AAEprYshWYOz3MEFgXSaE65TooRI8b9Ygyg"
-   export TELEGRAM_CHAT_ID="5757790216"
-   export CHECK_INTERVAL="180"
-   ```
-
-3. **Run the bot**:
-   ```bash
-   python cncf_issue_tracker.py
-   ```
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **Telegram Bot Not Responding**:
-   - Check bot token and chat ID
-   - Ensure bot is added to your chat
-   - Verify bot has permission to send messages
-
-2. **GitHub API Errors**:
-   - Check rate limits
-   - Verify repository names are correct
-   - Ensure repositories are public
-
-3. **Bot Not Starting**:
-   - Check environment variables
-   - Verify Python version (3.7+)
-   - Check Railway logs
-
-### Logs
-
-The bot provides detailed logging:
-- Startup information
-- Repository checking status
-- New issue notifications
-- Error messages
-- Rate limit warnings
-
-## 📈 Monitoring
-
-- **Startup Notification**: Sent when bot starts
-- **Issue Notifications**: Real-time for new issues
-- **Error Notifications**: Automatic error reporting
-- **Activity Logs**: Detailed logging in Railway dashboard
-
-## 🎉 Success!
-
-Once deployed, you'll receive:
-1. **Startup notification** with repository list
-2. **Real-time issue notifications** as they're created
-3. **Error notifications** if something goes wrong
-4. **24/7 monitoring** of your chosen repositories
-
-The bot will run continuously and automatically restart on failures thanks to Railway's restart policy!
+- API timeouts and HTTP errors are caught per-repository and logged; the bot continues checking remaining repositories
+- On unexpected errors in the main loop, the bot sends an error notification to Telegram and retries after 2 minutes
+- Railway's restart policy handles process-level failures
