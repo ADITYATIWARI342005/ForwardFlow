@@ -1,6 +1,15 @@
 # ForwardFlow
 
-A GitHub issue tracker bot that monitors public repositories and delivers formatted Telegram notifications for new issues.
+A GitHub issue tracker bot that monitors repositories and delivers formatted Telegram notifications for new issues.
+
+**The Motivation**: As an open-source contributor to multiple repositories and projects I faced the problem in keeping-up with the updates and discussions from those projects.
+One approach was to put those repos on watch, which would overwhelm the number of emails recieved, with the mails having no genuine context about the Activity, Which often made me miss on other relevant important mails, Therefore, I built this bot to keep me up-to-date with activities and discussions of the repositories I am interested in, saving a lot of time and effort, With maximum delay between activity and its notification being less than a minute. Which obviously can save time and effort for many tech-firm teams as well.
+
+---
+
+## Notification contents
+
+<img width="861" height="746" alt="image" src="https://github.com/user-attachments/assets/d812ca10-9854-4ef7-9f23-7e19fc4a3eb5" />
 
 ---
 
