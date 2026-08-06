@@ -1,3 +1,1 @@
-web: python cncf_issue_tracker_webhook.py
-
-
+web: python cncf_issue_tracker.py
